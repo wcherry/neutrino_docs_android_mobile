@@ -36,6 +36,13 @@ edits, conflict resolution, queued deletes/moves/renames · encrypted on-device 
 filters and saved searches · settings (theme, editor font and size, auto-save interval, typing
 options, devices, app lock, report a bug).
 
+**Added after the port (2026-10-18): printing.** "Print…" in the document menu, matching iOS Docs:
+the document as it stands at 11pt in the editor's family, folds opened, pictures fetched first,
+on paper colours whatever the theme. `ui/editor/DocumentPrint.kt` runs the editor's own
+`EditorRenderer` over a copy of the text, so markers, quote bars and code panels print as drawn;
+pagination, header, page numbers and the dialog are `neutrino_shared_android`'s `android/print`.
+Tests: `core` `PrintSourcesTest`, and `./gradlew :app:connectedDebugAndroidTest` (7, on an emulator).
+
 Mapped to Android equivalents:
 
 | iOS | Android |
