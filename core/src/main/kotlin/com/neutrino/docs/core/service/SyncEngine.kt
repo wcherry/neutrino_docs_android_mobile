@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.util.logging.Logger
+import com.neutrino.shared.core.sync.SyncActivity
 
 /** The parts of the content service the sync engine needs, so its conflict rules can be tested without HTTP. */
 interface DocSyncing {
@@ -270,3 +271,15 @@ class DeviceSessionService(private val api: DocsApi, private val scope: Coroutin
         (b.lastUsedAt ?: b.createdAt).compareTo(a.lastUsedAt ?: a.createdAt)
     }
 }
+
+/**
+ * The engine's state in the shared connectivity banner's terms. [SyncEngine.State.Offline] maps to
+ * idle: the banner reads connectivity from the monitor, and on a metered network the user keeps sync
+ * off it is the queued count, not "offline", that is true.
+ */
+val SyncEngine.State.activity: SyncActivity
+    get() = when (this) {
+        is SyncEngine.State.Syncing -> SyncActivity.Syncing(remaining)
+        is SyncEngine.State.Failed -> SyncActivity.Failed(reason)
+        SyncEngine.State.Idle, SyncEngine.State.Offline -> SyncActivity.Idle
+    }
