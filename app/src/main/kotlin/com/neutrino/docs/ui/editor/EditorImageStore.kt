@@ -48,6 +48,19 @@ class EditorImageStore(
 
     fun hasFailed(source: String) = source in failed
 
+    /**
+     * Loads every source not already in hand, and returns once each has arrived or failed — for
+     * drawing that cannot wait for [onLoad], such as a printed page, where a picture still loading
+     * is a placeholder on paper. Main thread, like the rest of the store.
+     */
+    suspend fun preload(sources: Collection<String>) {
+        for (source in sources) {
+            if (source.isEmpty() || source in images || source in failed) continue
+            val bitmap = withContext(Dispatchers.IO) { runCatching { bytes(source)?.let { ImagePrep.decodeBounded(it, maxPixels) } }.getOrNull() }
+            if (bitmap != null) images[source] = bitmap else failed += source
+        }
+    }
+
     /** Retries what failed — after the connection comes back. */
     fun retryFailed() = failed.clear()
 
