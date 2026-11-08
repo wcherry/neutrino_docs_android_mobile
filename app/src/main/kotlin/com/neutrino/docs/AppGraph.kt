@@ -3,9 +3,6 @@ package com.neutrino.docs
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.net.ConnectivityManager
-import android.net.Network
-import android.net.NetworkCapabilities
 import android.util.Base64
 import com.neutrino.docs.core.api.DocsApi
 import com.neutrino.docs.core.model.CacheReason
@@ -19,12 +16,16 @@ import com.neutrino.docs.core.service.OfflineStore
 import com.neutrino.docs.core.service.SyncEngine
 import com.neutrino.docs.core.service.VersionHistoryService
 import com.neutrino.shared.android.NeutrinoAccount
+import com.neutrino.shared.android.net.NetworkMonitor
 import com.neutrino.shared.android.storage.SecureStore
 import com.neutrino.shared.core.api.NeutrinoApps
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -43,9 +44,10 @@ class AppGraph(context: Context) {
 
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
-    val isOnline = MutableStateFlow(true)
+    val network = NetworkMonitor(this.context)
+    val isOnline: StateFlow<Boolean> = network.isOnline
     /** A metered network, which "Sync on Cellular" can rule out. */
-    val isMetered = MutableStateFlow(false)
+    val isMetered: StateFlow<Boolean> = network.isMetered
 
     val content = DocContentService(account.api, { account.keys.keyring() }, account.keyCheck, ::thumbnailBase64)
     val offline = OfflineStore(File(this.context.noBackupFilesDir, "offline-docs"), content)
@@ -70,7 +72,11 @@ class AppGraph(context: Context) {
             File(this.context.cacheDir, "exports").deleteRecursively()
             router.reset()
         }
-        watchNetwork()
+        network.start()
+        // Drains the queue on reconnecting; going offline stops a drain mid-flight.
+        isOnline.drop(1).onEach { online ->
+            if (account.auth.isSignedIn && (prefs.autoSync.value || !online)) sync.connectivityChanged(online)
+        }.launchIn(scope)
         if (account.auth.isSignedIn) scope.launch { search.start() }
     }
 
@@ -93,30 +99,6 @@ class AppGraph(context: Context) {
                 runCatching { offline.download(item, reason) }
             }
         }
-    }
-
-    private fun watchNetwork() {
-        val manager = context.getSystemService(ConnectivityManager::class.java)
-        runCatching {
-            manager.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
-                override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
-                    val online = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                    val metered = !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
-                    scope.launch { setOnline(online, metered) }
-                }
-
-                override fun onLost(network: Network) {
-                    scope.launch { setOnline(false, isMetered.value) }
-                }
-            })
-        }
-    }
-
-    private fun setOnline(online: Boolean, metered: Boolean) {
-        isMetered.value = metered
-        if (isOnline.value == online) return
-        isOnline.value = online
-        if (account.auth.isSignedIn && (prefs.autoSync.value || !online)) sync.connectivityChanged(online)
     }
 
     companion object {
