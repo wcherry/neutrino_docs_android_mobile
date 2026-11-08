@@ -52,6 +52,10 @@ import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
+import com.neutrino.shared.android.print.PrintController
+import com.neutrino.shared.android.print.PrintMenuItem
+import com.neutrino.shared.android.print.PrintStatus
+import com.neutrino.shared.android.print.rememberPrintController
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -155,6 +159,7 @@ fun EditorScreen(item: DocItem, onBack: () -> Unit) {
     var showLink by remember { mutableStateOf(false) }
     var find by remember { mutableStateOf<Boolean?>(null) } // null hidden, false find, true find & replace
     var message by remember { mutableStateOf<String?>(null) }
+    val printer = rememberPrintController()
 
     val isEditable = role.canEdit && loadError == null
     val isAvailableOffline = offlineDocs.any { it.id == item.id }
@@ -334,6 +339,9 @@ fun EditorScreen(item: DocItem, onBack: () -> Unit) {
                     },
                     isAvailableOffline = isAvailableOffline,
                     canUseServer = canUseServer,
+                    printer = printer,
+                    // The document as it stands — unsaved edits included — with its pictures fetched.
+                    makePrintJob = { DocumentPrint.job(item.displayName, controller.text, typeface, controller.images) },
                 )
             }
         }
@@ -380,6 +388,7 @@ fun EditorScreen(item: DocItem, onBack: () -> Unit) {
         StatusBar(saveState, online, DocTextStats.compute(document.documentText).summaryText, Modifier.navigationBarsPadding())
     }
 
+    PrintStatus(printer)
     if (showOutline) OutlineSheet(controller.outline, onDismiss = { showOutline = false }) { controller.moveCaret(it.characterOffset) }
     if (showVersions) dek?.let { key ->
         VersionHistoryDialog(item, key, onDismiss = { showVersions = false }) { restored ->
@@ -571,6 +580,8 @@ private fun DocumentMenu(
     onToggleOffline: () -> Unit,
     isAvailableOffline: Boolean,
     canUseServer: Boolean,
+    printer: PrintController,
+    makePrintJob: suspend () -> com.neutrino.shared.android.print.NeutrinoPrintJob,
 ) {
     var open by remember { mutableStateOf(false) }
     val foldable by controller.foldable.collectAsState()
@@ -590,6 +601,9 @@ private fun DocumentMenu(
             HorizontalDivider()
             item("Save Version…", canUseServer && isEditable, onSaveVersion)
             item("Version History", canUseServer, onVersionHistory)
+            HorizontalDivider()
+            // An offline copy prints, and so does a read-only one.
+            PrintMenuItem(printer, onDismiss = { open = false }, makeJob = makePrintJob)
             HorizontalDivider()
             item(if (isAvailableOffline) "Remove Offline Copy" else "Make Available Offline", f = onToggleOffline)
         }
