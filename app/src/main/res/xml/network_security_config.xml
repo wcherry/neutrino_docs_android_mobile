@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Plain HTTP is allowed so a self-hosted or development server (http://10.0.2.2:8080 from the
+     emulator) can be used, as the iOS apps allow with NSAllowsArbitraryLoads. Content is end-to-end
+     encrypted either way; the bearer token is not, which is why the hosted default is https. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

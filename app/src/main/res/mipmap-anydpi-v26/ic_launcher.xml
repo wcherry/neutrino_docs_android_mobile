@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The iOS icon is full-bleed art with the glyph well inside Android's 66dp safe zone, so it is
+     the background layer whole and the foreground is empty. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/ic_launcher_art" />
+    <foreground android:drawable="@android:color/transparent" />
+</adaptive-icon>
