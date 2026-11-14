@@ -41,6 +41,7 @@ import com.neutrino.docs.AppGraph
 import com.neutrino.docs.Route
 import com.neutrino.docs.Tab
 import com.neutrino.docs.core.model.DocsSection
+import com.neutrino.docs.core.service.activity
 import com.neutrino.docs.graph
 import com.neutrino.docs.ui.browser.BrowserScreen
 import com.neutrino.docs.ui.editor.EditorScreen
@@ -50,6 +51,7 @@ import com.neutrino.docs.ui.settings.AppLockScreen
 import com.neutrino.docs.ui.settings.DevicesScreen
 import com.neutrino.docs.ui.settings.SettingsScreen
 import com.neutrino.shared.android.security.AppLock
+import com.neutrino.shared.android.ui.ConnectivityBanner
 import com.neutrino.shared.android.ui.LockScreen
 import com.neutrino.shared.android.ui.auth.LoginScreen
 import com.neutrino.shared.android.ui.auth.RegisterScreen
@@ -134,6 +136,7 @@ private fun Home(graph: AppGraph) {
         },
     ) { padding ->
         Column(Modifier.padding(padding).consumeWindowInsets(padding).fillMaxSize()) {
+            Connectivity(graph)
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 val route = router.current
                 if (route == null) TabRoot(router.tab) else RouteContent(route)
@@ -190,4 +193,18 @@ private fun KeyFlow(onBack: () -> Unit, content: @Composable (onDone: () -> Unit
             }
         }
     }
+}
+
+/**
+ * Offline, the queue, syncing, a failed pass with Retry, and "Back online". Conflicted documents are
+ * left out of the count: they wait on the user in the Offline tab, not on a sync.
+ */
+@Composable
+private fun Connectivity(graph: AppGraph) {
+    val online by graph.isOnline.collectAsState()
+    val state by graph.sync.state.collectAsState()
+    val docs by graph.offline.documents.collectAsState()
+    val mutations by graph.offline.pendingMutations.collectAsState()
+    val pending = docs.count { it.pendingEdit != null && it.conflict == null } + mutations.size
+    ConnectivityBanner(isOnline = online, pendingChanges = pending, activity = state.activity, onRetry = { graph.sync.requestSync() })
 }

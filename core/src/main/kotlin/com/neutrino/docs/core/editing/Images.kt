@@ -1,5 +1,6 @@
 package com.neutrino.docs.core.editing
 
+import com.neutrino.docs.core.document.AttributedText
 import com.neutrino.docs.core.document.DocRange
 import com.neutrino.docs.core.document.DocumentNodeType
 import com.neutrino.shared.core.ooxml.DocNode
@@ -25,6 +26,20 @@ object DriveImageReference {
     }
 
     fun isReference(source: String) = fileId(source) != null
+
+    /**
+     * The source of every picture in [text], in document order, each once — what has to be fetched
+     * before the document can be drawn somewhere that cannot wait for it, such as a printed page.
+     */
+    fun sources(text: AttributedText): List<String> {
+        val found = LinkedHashSet<String>()
+        for ((_, attributes) in text.runs()) {
+            val node = attributes.atom?.node ?: continue
+            if (node.type != DocumentNodeType.IMAGE) continue
+            node.attr("src")?.stringValue?.takeIf { it.isNotEmpty() }?.let { found += it }
+        }
+        return found.toList()
+    }
 }
 
 /** Where a picture sits in its column — the web's `alignment` attribute. */
